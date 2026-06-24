@@ -1,0 +1,60 @@
+[gd_scene load_steps=2 format=3 uid="uid://villager_panel"]
+
+[ext_resource type="Script" path="res://scripts/ui/villager_panel.gd" id="1_script"]
+
+[node name="VillagerPanel" type="PanelContainer"]
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -200.0
+offset_top = -180.0
+grow_horizontal = 0
+grow_vertical = 0
+script = ExtResource("1_script")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="NameLabel" type="Label" parent="VBox"]
+layout_mode = 2
+text = "Villager"
+
+[node name="ActionLabel" type="Label" parent="VBox"]
+layout_mode = 2
+text = "idle"
+
+[node name="HungerLabel" type="Label" parent="VBox"]
+layout_mode = 2
+text = "Hunger"
+
+[node name="HungerBar" type="ProgressBar" parent="VBox"]
+layout_mode = 2
+max_value = 100.0
+value = 0.0
+show_percentage = false
+
+[node name="StaminaLabel" type="Label" parent="VBox"]
+layout_mode = 2
+text = "Stamina"
+
+[node name="StaminaBar" type="ProgressBar" parent="VBox"]
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="HealthLabel" type="Label" parent="VBox"]
+layout_mode = 2
+text = "Health"
+
+[node name="HealthBar" type="ProgressBar" parent="VBox"]
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="InventoryLabel" type="Label" parent="VBox"]
+layout_mode = 2
+text = "(empty)"

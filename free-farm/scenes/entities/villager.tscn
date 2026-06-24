@@ -1,0 +1,39 @@
+[gd_scene load_steps=4 format=3 uid="uid://villager_scene"]
+
+[ext_resource type="Script" path="res://scripts/entities/villager.gd" id="1_script"]
+[ext_resource type="Script" path="res://scripts/entities/villager_ai.gd" id="2_ai"]
+
+[sub_resource type="CircleShape2D" id="1"]
+radius = 5.0
+
+[sub_resource type="PlaceholderTexture2D" id="2"]
+size = Vector2(10, 10)
+
+[node name="Villager" type="CharacterBody2D"]
+script = ExtResource("1_script")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = SubResource("2")
+modulate = Color(0.3, 0.6, 0.9, 1.0)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("1")
+
+[node name="NavigationAgent2D" type="NavigationAgent2D" parent="."]
+path_desired_distance = 8.0
+target_desired_distance = 8.0
+
+[node name="StatusLabel" type="Label" parent="."]
+offset_left = -8.0
+offset_top = -16.0
+offset_right = 8.0
+offset_bottom = -4.0
+horizontal_alignment = 1
+text = ""
+
+[node name="VillagerAI" type="Node" parent="."]
+script = ExtResource("2_ai")
+
+[node name="DecisionTimer" type="Timer" parent="VillagerAI"]
+wait_time = 1.5
+autostart = true

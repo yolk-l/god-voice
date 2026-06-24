@@ -1,0 +1,12 @@
+# Godot
+.godot/
+*.import
+export_presets.cfg
+*.tmp
+
+# Claude Code
+.claude/
+
+# OS
+Thumbs.db
+.DS_Store
