@@ -24,6 +24,7 @@ GameManager="*res://scripts/systems/game_manager.gd"
 ResourceManager="*res://scripts/systems/resource_manager.gd"
 TechTree="*res://scripts/systems/tech_tree.gd"
 BuildingManager="*res://scripts/systems/building_manager.gd"
+EventLog="*res://scripts/systems/event_log.gd"
 
 [display]
 

@@ -10,7 +10,7 @@ enum TimePhase { DAY, DUSK, NIGHT }
 const DAY_DURATION := 360.0  # 6 minutes real time per full cycle
 const DAY_END := 0.5
 const DUSK_END := 0.67
-const SPEEDS := [0.0, 1.0, 2.0, 3.0]
+const SPEEDS := [0.0, 1.0, 2.0, 4.0]
 
 var time_of_day := 0.0
 var current_day := 1

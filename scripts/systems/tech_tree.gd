@@ -11,8 +11,8 @@ func _ready() -> void:
 	_init_techs()
 
 func _init_techs() -> void:
-	_register_tech("stone_axe", "石斧", "伐木效率+50%", [], {"wood": 3, "stone": 2}, 15.0, "buff", {"gather_efficiency_wood": 1.5})
-	_register_tech("stone_pickaxe", "石镐", "采矿效率+50%", [], {"wood": 3, "stone": 2}, 15.0, "buff", {"gather_efficiency_stone": 1.5})
+	_register_tech("stone_axe", "石斧", "解锁制作石斧 (伐木+50%)", [], {"wood": 3, "stone": 2}, 15.0, "recipe", {"stone_axe": true})
+	_register_tech("stone_pickaxe", "石镐", "解锁制作石镐 (采矿+50%)", [], {"wood": 3, "stone": 2}, 15.0, "recipe", {"stone_pickaxe": true})
 	_register_tech("cooking", "烹饪", "篝火可烹饪肉类", [], {"wood": 3, "stone": 1}, 10.0, "unlock", {"cooking": true})
 	_register_tech("farming", "农耕", "解锁建造农田", [], {"wood": 5, "fiber": 3}, 20.0, "building", {"farm": true})
 	_register_tech("weaving", "编织", "解锁绳索配方和织布机", [], {"fiber": 5}, 12.0, "building", {"loom": true})

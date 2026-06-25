@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3 uid="uid://main_scene"]
+[gd_scene load_steps=12 format=3 uid="uid://main_scene"]
 
 [ext_resource type="Script" path="res://scripts/world/world.gd" id="1_world"]
 [ext_resource type="Script" path="res://scripts/camera.gd" id="2_camera"]
@@ -8,6 +8,9 @@
 [ext_resource type="Script" path="res://scripts/ui/click_handler.gd" id="6_click"]
 [ext_resource type="Script" path="res://scripts/world/fog_of_war.gd" id="7_fog"]
 [ext_resource type="PackedScene" path="res://scenes/ui/tile_info_panel.tscn" id="8_tipanel"]
+[ext_resource type="PackedScene" path="res://scenes/ui/tech_panel.tscn" id="9_techpanel"]
+[ext_resource type="PackedScene" path="res://scenes/ui/storage_panel.tscn" id="10_storagepanel"]
+[ext_resource type="PackedScene" path="res://scenes/ui/history_panel.tscn" id="11_historypanel"]
 
 [node name="Main" type="Node2D"]
 
@@ -40,6 +43,12 @@ layer = 10
 [node name="VillagerPanel" parent="UI" instance=ExtResource("5_vpanel")]
 
 [node name="TileInfoPanel" parent="UI" instance=ExtResource("8_tipanel")]
+
+[node name="TechPanel" parent="UI" instance=ExtResource("9_techpanel")]
+
+[node name="StoragePanel" parent="UI" instance=ExtResource("10_storagepanel")]
+
+[node name="HistoryPanel" parent="UI" instance=ExtResource("11_historypanel")]
 
 [node name="ClickHandler" type="Node" parent="."]
 script = ExtResource("6_click")

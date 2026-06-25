@@ -3,6 +3,7 @@ extends Node
 var _utility_ai: UtilityAI
 var _villager: Villager
 var _world: Node
+var _first_eval: bool = true
 
 func _ready() -> void:
 	_villager = get_parent() as Villager
@@ -35,6 +36,7 @@ func _process(delta: float) -> void:
 		_utility_ai.current_action.tick(_villager, _world, delta * GameManager.game_speed)
 		if _utility_ai.current_action.is_completed():
 			_utility_ai.current_action = null
+			_try_auto_deposit()
 			_evaluate()
 
 func _on_decision_timer() -> void:
@@ -42,17 +44,38 @@ func _on_decision_timer() -> void:
 
 func _evaluate() -> void:
 	var best_action = _utility_ai.select_action(_villager, _world)
+	if _first_eval:
+		_first_eval = false
+		var scores: Dictionary = _utility_ai.get_all_scores(_villager, _world)
+		print("[AI] %s first eval. Scores: %s" % [_villager.villager_name, scores])
+		if best_action:
+			print("[AI] %s selected: %s" % [_villager.villager_name, best_action.get_action_name()])
+		else:
+			print("[AI] %s: NO ACTION AVAILABLE" % _villager.villager_name)
 	if best_action == null:
 		return
 	if best_action != _utility_ai.current_action:
 		if _utility_ai.current_action:
 			_utility_ai.current_action.cancel(_villager, _world)
+			_try_auto_deposit()
 		_utility_ai.current_action = best_action
 		best_action.start(_villager, _world)
 		_villager.current_action_name = best_action.get_action_name()
 
 func force_reevaluate() -> void:
 	_evaluate()
+
+func _try_auto_deposit() -> void:
+	var chest: Node = BuildingManager.get_nearest_chest_with_space(_villager.global_position)
+	if not chest:
+		return
+	var items: Dictionary = _villager.inventory.get_all_items()
+	for type in items:
+		if type in ["stone_axe", "stone_pickaxe"]:
+			continue
+		var amount: int = items[type]
+		var deposited: int = chest.add_item(type, amount)
+		_villager.inventory.remove_item(type, deposited)
 
 func get_scores() -> Dictionary:
 	return _utility_ai.get_all_scores(_villager, _world)

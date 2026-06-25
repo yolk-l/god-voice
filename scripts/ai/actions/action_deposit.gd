@@ -31,6 +31,8 @@ func tick(villager: Villager, world: Node, delta: float) -> void:
 		if chest and villager.global_position.distance_to(chest.global_position) < 20.0:
 			var items: Dictionary = villager.inventory.get_all_items()
 			for type in items:
+				if type in ["stone_axe", "stone_pickaxe"]:
+					continue
 				var amount: int = items[type]
 				var deposited: int = chest.add_item(type, amount)
 				villager.inventory.remove_item(type, deposited)

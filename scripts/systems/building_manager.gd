@@ -111,11 +111,37 @@ func get_nearest_chest_with_space(pos: Vector2) -> Node:
 			best = b
 	return best
 
+func has_items_available(villager: Node, cost: Dictionary) -> bool:
+	for type in cost:
+		var total: int = villager.inventory.get_amount(type) + get_storage_items(type)
+		if total < cost[type]:
+			return false
+	return true
+
+func withdraw_items(villager: Node, cost: Dictionary) -> bool:
+	for type in cost:
+		var have: int = villager.inventory.get_amount(type)
+		var need: int = cost[type] - have
+		if need <= 0:
+			continue
+		for b in _buildings:
+			if need <= 0:
+				break
+			if not is_instance_valid(b) or b.building_type != "chest" or not b.is_completed:
+				continue
+			var available: int = b.get_item_count(type)
+			var take: int = mini(need, available)
+			if take > 0:
+				b.remove_item(type, take)
+				villager.inventory.add_item(type, take)
+				need -= take
+		if need > 0:
+			return false
+	return true
+
 func get_unmet_material_urgency(villager: Node) -> float:
 	if not has_building("shelter") and not has_building("campfire"):
 		return 0.4
 	if not has_building("workbench"):
 		return 0.3
-	if not has_building("research_table"):
-		return 0.25
-	return 0.1
+	return 0.0

@@ -16,6 +16,7 @@ signal regenerated
 var is_depleted: bool = false
 var _regen_timer: float = 0.0
 var _regen_waiting: bool = false
+var _regen_accumulator: float = 0.0
 
 @onready var sprite: Sprite2D = $Sprite2D
 
@@ -50,7 +51,11 @@ func _process(delta: float) -> void:
 		if _regen_timer <= 0.0:
 			_regen_waiting = false
 	else:
-		current_amount += int(regen_rate * scaled_delta)
+		_regen_accumulator += regen_rate * scaled_delta
+		var add: int = int(_regen_accumulator)
+		if add > 0:
+			_regen_accumulator -= add
+			current_amount += add
 		if current_amount >= max_amount:
 			current_amount = max_amount
 			is_depleted = false

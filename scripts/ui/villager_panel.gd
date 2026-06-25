@@ -6,6 +6,7 @@ extends PanelContainer
 @onready var stamina_bar: ProgressBar = $VBox/StaminaBar
 @onready var health_bar: ProgressBar = $VBox/HealthBar
 @onready var inventory_label: Label = $VBox/InventoryLabel
+@onready var equipment_label: Label = $VBox/EquipmentLabel
 
 var _target_villager: Villager = null
 
@@ -49,3 +50,15 @@ func _update_display() -> void:
 			text += ", "
 		text += "%s:%d" % [type, items[type]]
 	inventory_label.text = text if text != "" else "(empty)"
+
+	var tool_name: String = v.get_equipped("tool")
+	if tool_name != "":
+		equipment_label.text = "Tool: %s" % _display_tool_name(tool_name)
+	else:
+		equipment_label.text = "Tool: --"
+
+func _display_tool_name(type: String) -> String:
+	match type:
+		"stone_axe": return "Stone Axe"
+		"stone_pickaxe": return "Stone Pickaxe"
+		_: return type

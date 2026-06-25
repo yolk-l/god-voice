@@ -26,6 +26,7 @@ func _ready() -> void:
 	generate_world()
 	_spawn_initial_villagers()
 	_setup_fog_tileset()
+	GameManager.day_changed.connect(_on_day_changed)
 
 func _setup_tileset() -> void:
 	var ts := TileSet.new()
@@ -48,22 +49,9 @@ func _setup_tileset() -> void:
 	var tex := ImageTexture.create_from_image(img)
 	source.texture = tex
 	source.texture_region_size = Vector2i(TILE_SIZE, TILE_SIZE)
-	ts.add_navigation_layer()
 	for i in range(7):
 		source.create_tile(Vector2i(i, 0))
 	ts.add_source(source, 0)
-	for i in range(7):
-		if i >= 2 and i <= 5:  # sand, grass, forest, rock
-			var tile_data: TileData = source.get_tile_data(Vector2i(i, 0), 0)
-			var nav_poly := NavigationPolygon.new()
-			var outline := PackedVector2Array([
-				Vector2(0, 0), Vector2(TILE_SIZE, 0),
-				Vector2(TILE_SIZE, TILE_SIZE), Vector2(0, TILE_SIZE)
-			])
-			nav_poly.add_outline(outline)
-			nav_poly.add_polygon(PackedInt32Array([0, 1, 2, 3]))
-			nav_poly.vertices = outline
-			tile_data.set_navigation_polygon(0, nav_poly)
 	tile_map.tile_set = ts
 
 func _setup_fog_tileset() -> void:
@@ -186,6 +174,27 @@ func _spawn_initial_villagers() -> void:
 		var offset := Vector2(randf_range(-20, 20), randf_range(-20, 20))
 		v.global_position = GameManager.village_center + offset
 		villagers.add_child(v)
+
+func _on_day_changed(day: int) -> void:
+	var summary := "Day %d:" % day
+	var building_types: Array[String] = []
+	for b in BuildingManager._buildings:
+		if is_instance_valid(b) and b.is_completed:
+			building_types.append(b.building_type)
+	if building_types.is_empty():
+		summary += " No buildings."
+	else:
+		summary += " Buildings: %s." % ", ".join(building_types)
+	summary += " Tech: %d/%d." % [TechTree.get_unlocked_count(), TechTree.get_all_techs().size()]
+	for v in villagers.get_children():
+		if v is Villager:
+			var inv_items: Array[String] = []
+			var items: Dictionary = v.inventory.get_all_items()
+			for type in items:
+				inv_items.append("%s:%d" % [type, items[type]])
+			var inv_str := "empty" if inv_items.is_empty() else ", ".join(inv_items)
+			summary += " %s[%s inv:%s]" % [v.villager_name, v.current_action_name, inv_str]
+	EventLog.add("Village", "status", summary)
 
 func is_tile_walkable(tile_pos: Vector2i) -> bool:
 	if tile_pos.x < 0 or tile_pos.x >= MAP_WIDTH or tile_pos.y < 0 or tile_pos.y >= MAP_HEIGHT:
