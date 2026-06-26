@@ -23,43 +23,47 @@ func get_action_name() -> String:
 	return "build"
 
 func can_execute(villager: Villager, world: Node) -> bool:
+	if not _completed and (_phase == Phase.BUILDING or _phase == Phase.WALKING_TO_SITE):
+		return true
 	return _find_best_building(villager) != ""
 
 func calculate_utility(villager: Villager, world: Node) -> float:
+	if not _completed and _phase == Phase.BUILDING:
+		return 0.95
 	var scores: Array[float] = []
 
-	if not BuildingManager.has_building("shelter"):
+	if BuildingManager.can_build_more("shelter"):
 		var night_factor: float = 0.65
 		if GameManager.is_approaching_night():
 			night_factor += 0.3
 		if _has_materials(villager, "shelter"):
 			scores.append(night_factor)
 
-	if not BuildingManager.has_building("campfire"):
+	if BuildingManager.can_build_more("campfire"):
 		if _has_materials(villager, "campfire"):
 			scores.append(0.65)
 
-	if not BuildingManager.has_building("chest"):
+	if BuildingManager.can_build_more("chest"):
 		if _has_materials(villager, "chest"):
 			scores.append(0.65)
 
-	if not BuildingManager.has_building("workbench"):
+	if BuildingManager.can_build_more("workbench"):
 		if _has_materials(villager, "workbench"):
 			scores.append(0.6)
 
-	if BuildingManager.has_building("workbench") and not BuildingManager.has_building("research_table"):
+	if BuildingManager.has_building("workbench") and BuildingManager.can_build_more("research_table"):
 		if _has_materials(villager, "research_table"):
 			scores.append(0.6)
 
-	if TechTree.is_building_unlocked("farm") and not BuildingManager.has_building("farm"):
+	if TechTree.is_building_unlocked("farm") and BuildingManager.can_build_more("farm"):
 		if _has_materials(villager, "farm"):
 			scores.append(0.55)
 
-	if TechTree.is_building_unlocked("smelter") and not BuildingManager.has_building("smelter"):
+	if TechTree.is_building_unlocked("smelter") and BuildingManager.can_build_more("smelter"):
 		if _has_materials(villager, "smelter"):
 			scores.append(0.55)
 
-	if TechTree.is_building_unlocked("loom") and not BuildingManager.has_building("loom"):
+	if TechTree.is_building_unlocked("loom") and BuildingManager.can_build_more("loom"):
 		if _has_materials(villager, "loom"):
 			scores.append(0.55)
 
@@ -72,10 +76,12 @@ func start(villager: Villager, world: Node) -> void:
 	_build_timer = 0.0
 	_target_building_type = _find_best_building(villager)
 	if _target_building_type == "":
+		print("[BUILD] %s: no buildable target found" % villager.villager_name)
 		_completed = true
 		return
 	_build_time_required = BUILD_TIMES.get(_target_building_type, 6.0)
 	_build_position = BuildingManager.find_build_position(world)
+	print("[BUILD] %s: starting %s at %s inv:%s" % [villager.villager_name, _target_building_type, _build_position, villager.inventory.get_all_items()])
 
 	if villager.inventory.has_materials_for(_target_building_type):
 		_phase = Phase.WALKING_TO_SITE
@@ -86,6 +92,7 @@ func start(villager: Villager, world: Node) -> void:
 			_phase = Phase.FETCHING
 			villager.navigate_to(chest.global_position)
 		else:
+			print("[BUILD] %s: no materials in inventory and no chest" % villager.villager_name)
 			_completed = true
 
 func tick(villager: Villager, world: Node, delta: float) -> void:
@@ -125,24 +132,24 @@ func _has_materials(villager: Villager, recipe: String) -> bool:
 	return BuildingManager.has_items_available(villager, cost)
 
 func _find_best_building(villager: Villager) -> String:
-	if not BuildingManager.has_building("shelter") and _has_materials(villager, "shelter"):
+	if BuildingManager.can_build_more("shelter") and _has_materials(villager, "shelter"):
 		return "shelter"
-	if not BuildingManager.has_building("campfire") and _has_materials(villager, "campfire"):
+	if BuildingManager.can_build_more("campfire") and _has_materials(villager, "campfire"):
 		return "campfire"
-	if not BuildingManager.has_building("chest") and _has_materials(villager, "chest"):
+	if BuildingManager.can_build_more("chest") and _has_materials(villager, "chest"):
 		return "chest"
-	if not BuildingManager.has_building("workbench") and _has_materials(villager, "workbench"):
+	if BuildingManager.can_build_more("workbench") and _has_materials(villager, "workbench"):
 		return "workbench"
-	if BuildingManager.has_building("workbench") and not BuildingManager.has_building("research_table"):
+	if BuildingManager.has_building("workbench") and BuildingManager.can_build_more("research_table"):
 		if _has_materials(villager, "research_table"):
 			return "research_table"
-	if TechTree.is_building_unlocked("farm") and not BuildingManager.has_building("farm"):
+	if TechTree.is_building_unlocked("farm") and BuildingManager.can_build_more("farm"):
 		if _has_materials(villager, "farm"):
 			return "farm"
-	if TechTree.is_building_unlocked("smelter") and not BuildingManager.has_building("smelter"):
+	if TechTree.is_building_unlocked("smelter") and BuildingManager.can_build_more("smelter"):
 		if _has_materials(villager, "smelter"):
 			return "smelter"
-	if TechTree.is_building_unlocked("loom") and not BuildingManager.has_building("loom"):
+	if TechTree.is_building_unlocked("loom") and BuildingManager.can_build_more("loom"):
 		if _has_materials(villager, "loom"):
 			return "loom"
 	return ""
@@ -155,6 +162,7 @@ func _place_building(villager: Villager, world: Node) -> void:
 	building.is_completed = true
 	world.get_node("Buildings").add_child(building)
 	BuildingManager.register(building)
+	print("[BUILD] %s: COMPLETED %s!" % [villager.villager_name, _target_building_type])
 	EventLog.add(villager.villager_name, "build", "%s built %s" % [villager.villager_name, _target_building_type])
 	if _target_building_type == "shelter" and villager.home == null:
 		villager.home = building

@@ -4,6 +4,7 @@ var _utility_ai: UtilityAI
 var _villager: Villager
 var _world: Node
 var _first_eval: bool = true
+var _eval_count: int = 0
 
 func _ready() -> void:
 	_villager = get_parent() as Villager
@@ -28,6 +29,7 @@ func _ready() -> void:
 	_utility_ai.register_action(preload("res://scripts/ai/actions/action_idle.gd").new())
 
 	$DecisionTimer.timeout.connect(_on_decision_timer)
+	print("[AI] VillagerAI loaded for %s with %d actions" % [_villager.villager_name, _utility_ai.actions.size()])
 
 func _process(delta: float) -> void:
 	if GameManager.game_speed == 0.0:
@@ -43,18 +45,24 @@ func _on_decision_timer() -> void:
 	_evaluate()
 
 func _evaluate() -> void:
+	_eval_count += 1
 	var best_action = _utility_ai.select_action(_villager, _world)
-	if _first_eval:
-		_first_eval = false
+	if _first_eval or _eval_count % 40 == 0:
 		var scores: Dictionary = _utility_ai.get_all_scores(_villager, _world)
-		print("[AI] %s first eval. Scores: %s" % [_villager.villager_name, scores])
-		if best_action:
-			print("[AI] %s selected: %s" % [_villager.villager_name, best_action.get_action_name()])
-		else:
-			print("[AI] %s: NO ACTION AVAILABLE" % _villager.villager_name)
+		var inv: Dictionary = _villager.inventory.get_all_items()
+		var top: Array = []
+		for key in scores:
+			if scores[key] > 0.01:
+				top.append("%s:%.2f" % [key, scores[key]])
+		print("[AI] %s eval#%d inv:%s scores:{%s}" % [_villager.villager_name, _eval_count, inv, ", ".join(top)])
+		if _first_eval:
+			_first_eval = false
 	if best_action == null:
 		return
 	if best_action != _utility_ai.current_action:
+		var old_name: String = _utility_ai.current_action.get_action_name() if _utility_ai.current_action else "none"
+		var new_name: String = best_action.get_action_name()
+		print("[AI] %s: %s -> %s" % [_villager.villager_name, old_name, new_name])
 		if _utility_ai.current_action:
 			_utility_ai.current_action.cancel(_villager, _world)
 			_try_auto_deposit()

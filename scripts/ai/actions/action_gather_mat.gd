@@ -34,9 +34,9 @@ func calculate_utility(villager: Villager, world: Node) -> float:
 		return 0.0
 	var camp: Vector2 = BuildingManager.get_camp()
 	var camp_dist: float = nearest.global_position.distance_to(camp)
-	var camp_penalty: float = clampf(camp_dist / 300.0, 0.0, 0.5)
+	var camp_factor: float = 1.0 - clampf(camp_dist / 400.0, 0.0, 0.5)
 	var distance_factor: float = 1.0 - clampf(villager.global_position.distance_to(nearest.global_position) / MAX_GATHER_RANGE, 0.0, 0.8)
-	return clampf((base * distance_factor) - camp_penalty, 0.0, 1.0)
+	return clampf(base * distance_factor * camp_factor, 0.0, 1.0)
 
 func start(villager: Villager, world: Node) -> void:
 	_completed = false
@@ -55,7 +55,9 @@ func start(villager: Villager, world: Node) -> void:
 		_auto_equip_tool(villager, _target_resource.resource_type)
 		ResourceManager.reserve(_target_resource, villager)
 		villager.navigate_to(_target_resource.global_position)
+		print("[GATHER] %s: targeting %s (%s)" % [villager.villager_name, needed_type, _target_resource.resource_type])
 	else:
+		print("[GATHER] %s: no resource found for %s" % [villager.villager_name, needed_type])
 		_completed = true
 
 func tick(villager: Villager, world: Node, delta: float) -> void:
@@ -97,8 +99,7 @@ func cancel(villager: Villager, world: Node) -> void:
 	_completed = true
 
 func _finish_gathering(villager: Villager) -> void:
-	var chest: Node = BuildingManager.get_nearest_chest_with_space(villager.global_position)
-	if chest or villager.inventory.is_full():
+	if villager.inventory.is_full():
 		_start_returning(villager)
 		return
 	var needed_type: String = _find_needed_material_type(villager)
@@ -118,7 +119,7 @@ func _finish_gathering(villager: Villager) -> void:
 		_walk_timer = 0.0
 		_gather_timer = 0.0
 	else:
-		_completed = true
+		_start_returning(villager)
 
 func _start_returning(villager: Villager) -> void:
 	_phase = Phase.RETURNING
@@ -165,37 +166,54 @@ func _release_and_complete(villager: Villager) -> void:
 	_completed = true
 
 func _find_needed_material_type(villager: Villager) -> String:
-	var target: String = _get_next_building_target()
-	if target == "":
-		return "material"
-	var cost: Dictionary = VillagerInventory.get_recipe_cost(target)
-	var biggest_shortfall := 0
-	var needed_type := ""
+	var targets: Array[String] = _get_all_building_targets()
+	for target in targets:
+		var cost: Dictionary = VillagerInventory.get_recipe_cost(target)
+		var result: String = _find_shortfall_type(villager, cost)
+		if result != "":
+			return result
+	var techs: Array = TechTree.get_researchable_techs()
+	for tech in techs:
+		var cost: Dictionary = tech["research_cost"]
+		var result: String = _find_shortfall_type(villager, cost)
+		if result != "":
+			return result
+	return "material"
+
+func _find_shortfall_type(villager: Villager, cost: Dictionary) -> String:
+	var shortfalls := []
 	for type in cost:
 		var have: int = villager.inventory.get_amount(type) + BuildingManager.get_storage_items(type)
 		var shortfall: int = cost[type] - have
-		if shortfall > biggest_shortfall:
-			biggest_shortfall = shortfall
-			needed_type = type
-	if needed_type == "":
-		return "material"
-	return needed_type
-
-func _get_next_building_target() -> String:
-	if not BuildingManager.has_building("shelter"):
-		return "shelter"
-	if not BuildingManager.has_building("campfire"):
-		return "campfire"
-	if not BuildingManager.has_building("chest"):
-		return "chest"
-	if not BuildingManager.has_building("workbench"):
-		return "workbench"
-	if not BuildingManager.has_building("research_table"):
-		return "research_table"
-	if TechTree.is_building_unlocked("farm") and not BuildingManager.has_building("farm"):
-		return "farm"
-	if TechTree.is_building_unlocked("smelter") and not BuildingManager.has_building("smelter"):
-		return "smelter"
-	if TechTree.is_building_unlocked("loom") and not BuildingManager.has_building("loom"):
-		return "loom"
+		if shortfall > 0:
+			shortfalls.append({"type": type, "amount": shortfall})
+	if shortfalls.is_empty():
+		return ""
+	shortfalls.sort_custom(func(a, b): return a["amount"] > b["amount"])
+	for entry in shortfalls:
+		var source: Node = ResourceManager.find_nearest_in_area(
+			villager.global_position, entry["type"], MAX_GATHER_RANGE, villager.known_area, true
+		)
+		if source:
+			return entry["type"]
 	return ""
+
+func _get_all_building_targets() -> Array[String]:
+	var targets: Array[String] = []
+	if BuildingManager.can_build_more("shelter"):
+		targets.append("shelter")
+	if BuildingManager.can_build_more("campfire"):
+		targets.append("campfire")
+	if BuildingManager.can_build_more("chest"):
+		targets.append("chest")
+	if BuildingManager.can_build_more("workbench"):
+		targets.append("workbench")
+	if BuildingManager.has_building("workbench") and BuildingManager.can_build_more("research_table"):
+		targets.append("research_table")
+	if TechTree.is_building_unlocked("farm") and BuildingManager.can_build_more("farm"):
+		targets.append("farm")
+	if TechTree.is_building_unlocked("smelter") and BuildingManager.can_build_more("smelter"):
+		targets.append("smelter")
+	if TechTree.is_building_unlocked("loom") and BuildingManager.can_build_more("loom"):
+		targets.append("loom")
+	return targets

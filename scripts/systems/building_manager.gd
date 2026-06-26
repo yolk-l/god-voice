@@ -3,6 +3,17 @@ extends Node
 signal building_placed(building: Node)
 signal building_completed(building: Node)
 
+const BUILDING_LIMITS := {
+	"shelter": 5,
+	"campfire": 1,
+	"chest": 3,
+	"workbench": 1,
+	"research_table": 1,
+	"farm": 3,
+	"smelter": 1,
+	"loom": 1,
+}
+
 var _buildings: Array[Node] = []
 var _occupied_tiles: Dictionary = {}  # {Vector2i: building_ref}
 var camp_position: Vector2 = Vector2.ZERO  # camp center, all building around here
@@ -48,6 +59,12 @@ func get_buildings_of_type(type: String) -> Array[Node]:
 		if is_instance_valid(b) and b.building_type == type and b.is_completed:
 			result.append(b)
 	return result
+
+func get_building_count(type: String) -> int:
+	return get_buildings_of_type(type).size()
+
+func can_build_more(type: String) -> bool:
+	return get_building_count(type) < BUILDING_LIMITS.get(type, 1)
 
 func get_nearest_building(pos: Vector2, type: String) -> Node:
 	var best: Node = null
@@ -140,8 +157,18 @@ func withdraw_items(villager: Node, cost: Dictionary) -> bool:
 	return true
 
 func get_unmet_material_urgency(villager: Node) -> float:
-	if not has_building("shelter") and not has_building("campfire"):
+	if can_build_more("shelter") or can_build_more("campfire"):
 		return 0.4
-	if not has_building("workbench"):
+	if can_build_more("chest") or can_build_more("workbench"):
 		return 0.3
+	if can_build_more("research_table"):
+		return 0.25
+	if TechTree.is_building_unlocked("farm") and can_build_more("farm"):
+		return 0.2
+	if TechTree.is_building_unlocked("smelter") and can_build_more("smelter"):
+		return 0.2
+	if TechTree.is_building_unlocked("loom") and can_build_more("loom"):
+		return 0.2
+	if not TechTree.get_researchable_techs().is_empty():
+		return 0.15
 	return 0.0

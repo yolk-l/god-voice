@@ -144,6 +144,7 @@ func spawn_resources(terrain: Array, container: Node2D) -> void:
 	var guaranteed_berries: int = 0
 	var guaranteed_trees: int = 0
 	var guaranteed_stones: int = 0
+	var guaranteed_fibers: int = 0
 
 	for x in range(width):
 		for y in range(height):
@@ -159,6 +160,8 @@ func spawn_resources(terrain: Array, container: Node2D) -> void:
 							guaranteed_berries += 1
 					elif rng.randf() < 0.08:
 						_place_resource(container, pos, "fiber", "material", 8, 1.5, 2, true, 1.0, 20.0)
+						if near_village:
+							guaranteed_fibers += 1
 				Terrain.FOREST:
 					if rng.randf() < 0.12:
 						_place_resource(container, pos, "wood", "material", 8, 3.0, 2, true, 0.3, 45.0)
@@ -174,9 +177,9 @@ func spawn_resources(terrain: Array, container: Node2D) -> void:
 					elif rng.randf() < 0.06:
 						_place_resource(container, pos, "iron_ore", "material", 6, 6.0, 1, false, 0.0, 0.0)
 
-	_ensure_minimum_resources(terrain, container, village_pos, guaranteed_berries, guaranteed_trees, guaranteed_stones, rng)
+	_ensure_minimum_resources(terrain, container, village_pos, guaranteed_berries, guaranteed_trees, guaranteed_stones, guaranteed_fibers, rng)
 
-func _ensure_minimum_resources(terrain: Array, container: Node2D, village_pos: Vector2i, berries: int, trees: int, stones: int, rng: RandomNumberGenerator) -> void:
+func _ensure_minimum_resources(terrain: Array, container: Node2D, village_pos: Vector2i, berries: int, trees: int, stones: int, fibers: int, rng: RandomNumberGenerator) -> void:
 	var width: int = terrain.size()
 	var height: int = terrain[0].size()
 	while berries < 5:
@@ -204,6 +207,14 @@ func _ensure_minimum_resources(terrain: Array, container: Node2D, village_pos: V
 				var pos: Vector2 = Vector2(pos_tile.x * TILE_SIZE + TILE_SIZE / 2.0, pos_tile.y * TILE_SIZE + TILE_SIZE / 2.0)
 				_place_resource(container, pos, "stone", "material", 10, 5.0, 1, true, 0.15, 90.0)
 				stones += 1
+	while fibers < 3:
+		var offset: Vector2i = Vector2i(rng.randi_range(-6, 6), rng.randi_range(-6, 6))
+		var pos_tile: Vector2i = village_pos + offset
+		if pos_tile.x >= 0 and pos_tile.x < width and pos_tile.y >= 0 and pos_tile.y < height:
+			if terrain[pos_tile.x][pos_tile.y] == Terrain.GRASS:
+				var pos: Vector2 = Vector2(pos_tile.x * TILE_SIZE + TILE_SIZE / 2.0, pos_tile.y * TILE_SIZE + TILE_SIZE / 2.0)
+				_place_resource(container, pos, "fiber", "material", 8, 1.5, 2, true, 1.0, 20.0)
+				fibers += 1
 
 func _place_resource(container: Node2D, pos: Vector2, type: String, category: String, max_amount: int, gather_time: float, gather_amount: int, regenerate: bool, regen_rate: float, regen_delay: float) -> void:
 	var resource_node: Node = preload("res://scenes/world/resource_node.tscn").instantiate()

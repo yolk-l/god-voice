@@ -12,11 +12,15 @@ func get_action_name() -> String:
 	return "research"
 
 func can_execute(villager: Villager, world: Node) -> bool:
+	if not _completed and _phase == Phase.RESEARCHING:
+		return true
 	if not BuildingManager.has_building("research_table"):
 		return false
 	return _find_researchable_tech(villager) != ""
 
 func calculate_utility(villager: Villager, world: Node) -> float:
+	if not _completed and _phase == Phase.RESEARCHING:
+		return 0.95
 	if _find_researchable_tech(villager) == "":
 		return 0.0
 	return 0.55

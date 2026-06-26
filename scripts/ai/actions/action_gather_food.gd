@@ -34,9 +34,9 @@ func calculate_utility(villager: Villager, world: Node) -> float:
 		return 0.0
 	var camp: Vector2 = BuildingManager.get_camp()
 	var camp_dist: float = nearest.global_position.distance_to(camp)
-	var camp_penalty: float = clampf(camp_dist / 300.0, 0.0, 0.5)
+	var camp_factor: float = 1.0 - clampf(camp_dist / 400.0, 0.0, 0.5)
 	var distance_factor: float = 1.0 - clampf(villager.global_position.distance_to(nearest.global_position) / MAX_GATHER_RANGE, 0.0, 0.8)
-	return clampf((base * distance_factor) - camp_penalty, 0.0, 1.0)
+	return clampf(base * distance_factor * camp_factor, 0.0, 1.0)
 
 func start(villager: Villager, world: Node) -> void:
 	_completed = false
