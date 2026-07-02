@@ -36,21 +36,19 @@ func _get_terrain_name() -> String:
 		3: return "Grass"
 		4: return "Forest"
 		5: return "Rock"
-		6: return "Mountain"
 		_: return "Unknown"
 
 func _get_tile_contents() -> String:
 	var lines: Array[String] = []
-	var tile_world_pos: Vector2 = Vector2(_tile_pos) * 16.0 + Vector2(8, 8)
 
-	var resources: Array[Node] = ResourceManager.get_all_of_type("")
-	for res in resources:
-		if not is_instance_valid(res):
-			continue
-		var res_tile: Vector2i = Vector2i(res.global_position / 16.0)
-		if res_tile == _tile_pos:
-			var status: String = " (depleted)" if res.is_depleted else " [%d/%d]" % [res.current_amount, res.max_amount]
-			lines.append(_get_resource_display(res.resource_type) + status)
+	var res_info: Dictionary = _world.get_tile_resource(_tile_pos)
+	if not res_info.is_empty():
+		var status: String
+		if res_info["amount"] <= 0:
+			status = " (depleted)"
+		else:
+			status = " [%d/%d]" % [res_info["amount"], res_info["max"]]
+		lines.append(_get_resource_display(res_info["type"]) + status)
 
 	var buildings_node: Node = _world.get_node("Buildings")
 	for b in buildings_node.get_children():
@@ -85,6 +83,9 @@ func _get_building_display(b: Node) -> String:
 		"farm": name = "Farm"
 		"smelter": name = "Smelter"
 		"loom": name = "Loom"
+		"lumber_camp": name = "Lumber Camp"
+		"quarry": name = "Quarry"
+		"fishing_dock": name = "Fishing Dock"
 		_: name = b.building_type
 	if b.building_type == "chest":
 		var items: Dictionary = b.get_all_items()
@@ -93,6 +94,6 @@ func _get_building_display(b: Node) -> String:
 			for type in items:
 				parts.append("%s:%d" % [type, items[type]])
 			name += "\n  " + ", ".join(parts)
-	if b.building_type == "farm" and b.has_harvest():
+	if b.has_harvest():
 		name += " (harvest ready)"
 	return name

@@ -17,6 +17,9 @@ func _init_techs() -> void:
 	_register_tech("farming", "农耕", "解锁建造农田", [], {"wood": 5, "fiber": 3}, 20.0, "building", {"farm": true})
 	_register_tech("weaving", "编织", "解锁绳索配方和织布机", [], {"fiber": 5}, 12.0, "building", {"loom": true})
 	_register_tech("smelting", "冶炼", "解锁冶铁台", ["stone_pickaxe"], {"stone": 5, "wood": 3}, 25.0, "building", {"smelter": true})
+	_register_tech("forestry", "林业", "解锁伐木场", ["stone_axe"], {"wood": 5, "stone": 3}, 15.0, "building", {"lumber_camp": true})
+	_register_tech("mining_tech", "采矿", "解锁矿坑", ["stone_pickaxe"], {"stone": 5, "wood": 3}, 18.0, "building", {"quarry": true})
+	_register_tech("fishing", "渔业", "解锁渔场", [], {"wood": 5, "fiber": 3}, 12.0, "building", {"fishing_dock": true})
 	_register_tech("improved_tools", "改良工具", "所有采集效率+100%", ["smelting"], {"iron_ingot": 2}, 30.0, "buff", {"gather_efficiency_all": 2.0})
 	_register_tech("irrigation", "灌溉", "农田产出翻倍", ["farming"], {"wood": 5, "stone": 3}, 25.0, "buff", {"farm_output": 2.0})
 

@@ -12,10 +12,21 @@ const BUILDING_LIMITS := {
 	"farm": 3,
 	"smelter": 1,
 	"loom": 1,
+	"lumber_camp": 2,
+	"quarry": 2,
+	"fishing_dock": 2,
+}
+
+const TERRAIN_REQUIREMENTS := {
+	"farm": [3],
+	"lumber_camp": [4],
+	"quarry": [5],
+	"fishing_dock": [2, 3],
 }
 
 var _buildings: Array[Node] = []
 var _occupied_tiles: Dictionary = {}  # {Vector2i: building_ref}
+var _build_reservations: Dictionary = {}  # {building_type: int}
 var camp_position: Vector2 = Vector2.ZERO  # camp center, all building around here
 
 func _ready() -> void:
@@ -64,7 +75,21 @@ func get_building_count(type: String) -> int:
 	return get_buildings_of_type(type).size()
 
 func can_build_more(type: String) -> bool:
-	return get_building_count(type) < BUILDING_LIMITS.get(type, 1)
+	var total: int = get_building_count(type) + int(_build_reservations.get(type, 0))
+	return total < int(BUILDING_LIMITS.get(type, 1))
+
+func reserve_build(type: String) -> bool:
+	var total: int = get_building_count(type) + int(_build_reservations.get(type, 0))
+	if total >= int(BUILDING_LIMITS.get(type, 1)):
+		return false
+	_build_reservations[type] = int(_build_reservations.get(type, 0)) + 1
+	return true
+
+func release_reservation(type: String) -> void:
+	if _build_reservations.has(type):
+		_build_reservations[type] -= 1
+		if _build_reservations[type] <= 0:
+			_build_reservations.erase(type)
 
 func get_nearest_building(pos: Vector2, type: String) -> Node:
 	var best: Node = null
@@ -83,9 +108,9 @@ func get_nearest_building(pos: Vector2, type: String) -> Node:
 func is_tile_occupied(tile_pos: Vector2i) -> bool:
 	return _occupied_tiles.has(tile_pos)
 
-func find_build_position(world: Node) -> Vector2:
+func find_build_position(world: Node, building_type: String = "") -> Vector2:
 	var center_tile: Vector2i = Vector2i(get_camp() / 16.0)
-	for radius in range(1, 12):
+	for radius in range(1, 16):
 		for dx in range(-radius, radius + 1):
 			for dy in range(-radius, radius + 1):
 				if abs(dx) != radius and abs(dy) != radius:
@@ -93,9 +118,24 @@ func find_build_position(world: Node) -> Vector2:
 				var tile: Vector2i = center_tile + Vector2i(dx, dy)
 				if is_tile_occupied(tile):
 					continue
-				if world.is_tile_buildable(tile):
-					return Vector2(tile) * 16.0 + Vector2(8, 8)
+				if not _is_valid_build_tile(world, tile, building_type):
+					continue
+				return Vector2(tile) * 16.0 + Vector2(8, 8)
 	return get_camp()
+
+func _is_valid_build_tile(world: Node, tile: Vector2i, building_type: String) -> bool:
+	if not world.is_tile_walkable(tile):
+		return false
+	var terrain: int = world.get_terrain_at(tile)
+	if TERRAIN_REQUIREMENTS.has(building_type):
+		var allowed: Array = TERRAIN_REQUIREMENTS[building_type]
+		if terrain not in allowed:
+			return false
+		if building_type == "fishing_dock" and world.has_method("is_adjacent_to_water"):
+			if not world.is_adjacent_to_water(tile):
+				return false
+		return true
+	return terrain == 3 or terrain == 2
 
 func get_village_center() -> Vector2:
 	return get_camp()
@@ -127,6 +167,13 @@ func get_nearest_chest_with_space(pos: Vector2) -> Node:
 			best_dist = dist
 			best = b
 	return best
+
+func get_harvestable_buildings() -> Array[Node]:
+	var result: Array[Node] = []
+	for b in _buildings:
+		if is_instance_valid(b) and b.is_completed and b.has_harvest():
+			result.append(b)
+	return result
 
 func has_items_available(villager: Node, cost: Dictionary) -> bool:
 	for type in cost:
@@ -168,6 +215,12 @@ func get_unmet_material_urgency(villager: Node) -> float:
 	if TechTree.is_building_unlocked("smelter") and can_build_more("smelter"):
 		return 0.2
 	if TechTree.is_building_unlocked("loom") and can_build_more("loom"):
+		return 0.2
+	if TechTree.is_building_unlocked("lumber_camp") and can_build_more("lumber_camp"):
+		return 0.2
+	if TechTree.is_building_unlocked("quarry") and can_build_more("quarry"):
+		return 0.2
+	if TechTree.is_building_unlocked("fishing_dock") and can_build_more("fishing_dock"):
 		return 0.2
 	if not TechTree.get_researchable_techs().is_empty():
 		return 0.15

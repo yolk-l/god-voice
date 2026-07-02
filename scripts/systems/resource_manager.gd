@@ -1,60 +1,56 @@
 extends Node
 
-var _resources: Array[Node] = []
-var _reservations: Dictionary = {}  # {resource_node_id: villager_ref}
+const TILE_SIZE := 16
 
-func register(resource_node: Node) -> void:
-	if resource_node not in _resources:
-		_resources.append(resource_node)
+var _resource_tiles: Dictionary = {}   # {Vector2i: {type: String, category: String}}
+var _reservations: Dictionary = {}     # {Vector2i: villager_ref}
 
-func unregister(resource_node: Node) -> void:
-	_resources.erase(resource_node)
-	release(resource_node)
+func register_tile(tile_pos: Vector2i, type: String, category: String) -> void:
+	_resource_tiles[tile_pos] = {"type": type, "category": category}
 
-func find_nearest(pos: Vector2, type: String, max_distance: float, exclude_reserved: bool = true) -> Node:
-	var best: Node = null
+func unregister_tile(tile_pos: Vector2i) -> void:
+	_resource_tiles.erase(tile_pos)
+	_reservations.erase(tile_pos)
+
+func find_nearest(pos: Vector2, type: String, max_distance: float, exclude_reserved: bool = true) -> Variant:
+	var best_tile: Variant = null
 	var best_dist := max_distance
-	for res in _resources:
-		if not is_instance_valid(res):
+	for tile_pos in _resource_tiles:
+		var info: Dictionary = _resource_tiles[tile_pos]
+		if type != "" and info["type"] != type and info["category"] != type:
 			continue
-		if res.is_depleted:
+		if exclude_reserved and _reservations.has(tile_pos):
 			continue
-		if type != "" and res.resource_type != type and res.resource_category != type:
-			continue
-		if exclude_reserved and is_reserved(res):
-			continue
-		var dist: float = pos.distance_to(res.global_position)
+		var world_pos: Vector2 = Vector2(tile_pos) * TILE_SIZE + Vector2(TILE_SIZE / 2.0, TILE_SIZE / 2.0)
+		var dist: float = pos.distance_to(world_pos)
 		if dist < best_dist:
 			best_dist = dist
-			best = res
-	return best
+			best_tile = tile_pos
+	return best_tile
 
-func find_nearest_in_area(pos: Vector2, type: String, max_distance: float, known_area: Dictionary, exclude_reserved: bool = true) -> Node:
-	var best: Node = null
+func find_nearest_in_area(pos: Vector2, type: String, max_distance: float, known_area: Dictionary, exclude_reserved: bool = true) -> Variant:
+	var best_tile: Variant = null
 	var best_dist := max_distance
-	for res in _resources:
-		if not is_instance_valid(res):
-			continue
-		if res.is_depleted:
-			continue
-		if type != "" and res.resource_type != type and res.resource_category != type:
-			continue
-		if exclude_reserved and is_reserved(res):
-			continue
-		var tile_pos: Vector2i = Vector2i(res.global_position / 16.0)
+	for tile_pos in _resource_tiles:
 		if not known_area.has(tile_pos):
 			continue
-		var dist: float = pos.distance_to(res.global_position)
+		var info: Dictionary = _resource_tiles[tile_pos]
+		if type != "" and info["type"] != type and info["category"] != type:
+			continue
+		if exclude_reserved and _reservations.has(tile_pos):
+			continue
+		var world_pos: Vector2 = Vector2(tile_pos) * TILE_SIZE + Vector2(TILE_SIZE / 2.0, TILE_SIZE / 2.0)
+		var dist: float = pos.distance_to(world_pos)
 		if dist < best_dist:
 			best_dist = dist
-			best = res
-	return best
+			best_tile = tile_pos
+	return best_tile
 
-func reserve(resource_node: Node, villager: Node) -> void:
-	_reservations[resource_node.get_instance_id()] = villager
+func reserve(tile_pos: Vector2i, villager: Node) -> void:
+	_reservations[tile_pos] = villager
 
-func release(resource_node: Node) -> void:
-	_reservations.erase(resource_node.get_instance_id())
+func release(tile_pos: Vector2i) -> void:
+	_reservations.erase(tile_pos)
 
 func release_all_for(villager: Node) -> void:
 	var to_remove: Array = []
@@ -64,14 +60,16 @@ func release_all_for(villager: Node) -> void:
 	for key in to_remove:
 		_reservations.erase(key)
 
-func is_reserved(resource_node: Node) -> bool:
-	return _reservations.has(resource_node.get_instance_id())
+func is_reserved(tile_pos: Vector2i) -> bool:
+	return _reservations.has(tile_pos)
 
-func get_all_of_type(type: String) -> Array[Node]:
-	var result: Array[Node] = []
-	for res in _resources:
-		if not is_instance_valid(res):
-			continue
-		if type == "" or res.resource_type == type or res.resource_category == type:
-			result.append(res)
+func get_all_of_type(type: String) -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	for tile_pos in _resource_tiles:
+		var info: Dictionary = _resource_tiles[tile_pos]
+		if type == "" or info["type"] == type or info["category"] == type:
+			result.append(tile_pos)
 	return result
+
+func tile_to_world_pos(tile_pos: Vector2i) -> Vector2:
+	return Vector2(tile_pos) * TILE_SIZE + Vector2(TILE_SIZE / 2.0, TILE_SIZE / 2.0)

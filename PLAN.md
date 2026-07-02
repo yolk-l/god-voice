@@ -1,4 +1,4 @@
-# Free Farm — 游戏设计与开发计划
+# God Voice — 游戏设计与开发计划
 
 ## 一、项目概述
 
@@ -43,7 +43,7 @@
 ### 3.1 项目目录结构
 
 ```
-free-farm/
+god-voice/
 ├── project.godot
 ├── PLAN.md
 │

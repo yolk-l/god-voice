@@ -16,6 +16,9 @@ func can_execute(villager: Villager, world: Node) -> bool:
 		return true
 	if not BuildingManager.has_building("research_table"):
 		return false
+	var table: Node = BuildingManager.get_nearest_building(villager.global_position, "research_table")
+	if table and table.is_occupied():
+		return false
 	return _find_researchable_tech(villager) != ""
 
 func calculate_utility(villager: Villager, world: Node) -> float:

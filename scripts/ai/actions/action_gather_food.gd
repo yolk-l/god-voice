@@ -2,21 +2,20 @@ extends Action
 
 enum Phase { WALKING_TO_RESOURCE, GATHERING, RETURNING }
 
-var _target_resource: Node = null
+var _target_tile: Variant = null  # Vector2i or null
 var _gather_timer: float = 0.0
 var _walk_timer: float = 0.0
 var _phase: int = Phase.WALKING_TO_RESOURCE
 const MAX_WALK_TIME := 30.0
+const MAX_GATHER_RANGE := 200.0
 
 func get_action_name() -> String:
 	return "gather_food"
 
-const MAX_GATHER_RANGE := 200.0
-
 func can_execute(villager: Villager, world: Node) -> bool:
 	if villager.inventory.is_full():
 		return false
-	var nearest: Node = ResourceManager.find_nearest_in_area(
+	var nearest = ResourceManager.find_nearest_in_area(
 		villager.global_position, "food", MAX_GATHER_RANGE, villager.known_area, true
 	)
 	return nearest != null
@@ -27,15 +26,16 @@ func calculate_utility(villager: Villager, world: Node) -> float:
 	var food_urgency: float = 0.7 if total_food == 0 else 0.3
 	var base: float = hunger_factor * food_urgency
 
-	var nearest: Node = ResourceManager.find_nearest_in_area(
+	var nearest = ResourceManager.find_nearest_in_area(
 		villager.global_position, "food", MAX_GATHER_RANGE, villager.known_area, true
 	)
 	if nearest == null:
 		return 0.0
+	var nearest_world_pos: Vector2 = ResourceManager.tile_to_world_pos(nearest)
 	var camp: Vector2 = BuildingManager.get_camp()
-	var camp_dist: float = nearest.global_position.distance_to(camp)
+	var camp_dist: float = nearest_world_pos.distance_to(camp)
 	var camp_factor: float = 1.0 - clampf(camp_dist / 400.0, 0.0, 0.5)
-	var distance_factor: float = 1.0 - clampf(villager.global_position.distance_to(nearest.global_position) / MAX_GATHER_RANGE, 0.0, 0.8)
+	var distance_factor: float = 1.0 - clampf(villager.global_position.distance_to(nearest_world_pos) / MAX_GATHER_RANGE, 0.0, 0.8)
 	return clampf(base * distance_factor * camp_factor, 0.0, 1.0)
 
 func start(villager: Villager, world: Node) -> void:
@@ -43,19 +43,19 @@ func start(villager: Villager, world: Node) -> void:
 	_phase = Phase.WALKING_TO_RESOURCE
 	_gather_timer = 0.0
 	_walk_timer = 0.0
-	_target_resource = ResourceManager.find_nearest_in_area(
+	_target_tile = ResourceManager.find_nearest_in_area(
 		villager.global_position, "food", MAX_GATHER_RANGE, villager.known_area, true
 	)
-	if _target_resource:
-		ResourceManager.reserve(_target_resource, villager)
-		villager.navigate_to(_target_resource.global_position)
+	if _target_tile != null:
+		ResourceManager.reserve(_target_tile, villager)
+		villager.navigate_to(ResourceManager.tile_to_world_pos(_target_tile))
 	else:
 		_completed = true
 
 func tick(villager: Villager, world: Node, delta: float) -> void:
 	match _phase:
 		Phase.WALKING_TO_RESOURCE:
-			if not is_instance_valid(_target_resource) or _target_resource.is_depleted:
+			if _target_tile == null or world.is_tile_depleted(_target_tile):
 				_release_and_complete(villager)
 				return
 			_walk_timer += delta
@@ -67,14 +67,15 @@ func tick(villager: Villager, world: Node, delta: float) -> void:
 				_gather_timer = 0.0
 				villager.needs.set_working(true)
 		Phase.GATHERING:
-			if not is_instance_valid(_target_resource) or _target_resource.is_depleted:
+			if _target_tile == null or world.is_tile_depleted(_target_tile):
 				villager.needs.set_working(false)
 				_start_returning(villager)
 				return
-			var efficiency: float = villager.get_gather_efficiency(_target_resource.resource_type)
+			var resource_type: String = world.get_tile_resource_type(_target_tile)
+			var efficiency: float = villager.get_gather_efficiency(resource_type)
 			_gather_timer += delta * efficiency
-			if _gather_timer >= _target_resource.gather_time:
-				var result: Dictionary = _target_resource.gather()
+			if _gather_timer >= world.get_tile_gather_time(_target_tile):
+				var result: Dictionary = world.gather_tile(_target_tile)
 				if not result.is_empty():
 					villager.inventory.add_item(result["type"], result["amount"])
 				villager.needs.set_working(false)
@@ -110,9 +111,9 @@ func _deposit_at_camp(villager: Villager) -> void:
 			villager.inventory.remove_item(type, deposited)
 
 func _release_resource() -> void:
-	if _target_resource and is_instance_valid(_target_resource):
-		ResourceManager.release(_target_resource)
-	_target_resource = null
+	if _target_tile != null:
+		ResourceManager.release(_target_tile)
+	_target_tile = null
 
 func _release_and_complete(villager: Villager) -> void:
 	_release_resource()

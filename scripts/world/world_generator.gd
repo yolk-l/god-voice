@@ -2,23 +2,15 @@ class_name WorldGenerator
 extends RefCounted
 
 const TILE_SIZE := 16
+const CHUNK_SIZE := 16
 
 var world_seed: int = 0
 
 var _height_noise: FastNoiseLite
 var _moisture_noise: FastNoiseLite
+var _rng: RandomNumberGenerator
 
-enum Terrain { DEEP_WATER, SHALLOW_WATER, SAND, GRASS, FOREST, ROCK, MOUNTAIN }
-
-func generate(width: int, height: int) -> Array:
-	_setup_noise()
-	var terrain: Array = _generate_height_map(width, height)
-	_apply_moisture(terrain, width, height)
-	_force_border_mountains(terrain, width, height)
-	if not _validate_connectivity(terrain, width, height):
-		world_seed += 1
-		return generate(width, height)
-	return terrain
+enum Terrain { DEEP_WATER, SHALLOW_WATER, SAND, GRASS, FOREST, ROCK }
 
 func _setup_noise() -> void:
 	_height_noise = FastNoiseLite.new()
@@ -31,15 +23,33 @@ func _setup_noise() -> void:
 	_moisture_noise.seed = world_seed + 1000
 	_moisture_noise.frequency = 0.06
 
-func _generate_height_map(width: int, height: int) -> Array:
-	var terrain: Array = []
-	terrain.resize(width)
-	for x in range(width):
-		terrain[x] = []
-		terrain[x].resize(height)
-		for y in range(height):
-			var noise_val: float = _height_noise.get_noise_2d(x, y)
-			terrain[x][y] = _noise_to_terrain(noise_val)
+	_rng = RandomNumberGenerator.new()
+
+func generate_chunk(chunk_pos: Vector2i) -> Dictionary:
+	if _height_noise == null:
+		_setup_noise()
+	var origin := chunk_pos * CHUNK_SIZE
+	_rng.seed = world_seed + chunk_pos.x * 73856093 + chunk_pos.y * 19349663
+	var tiles: Dictionary = {}
+	for lx in range(CHUNK_SIZE):
+		for ly in range(CHUNK_SIZE):
+			var gx: int = origin.x + lx
+			var gy: int = origin.y + ly
+			var tile_pos := Vector2i(gx, gy)
+			var terrain: int = _get_terrain(gx, gy)
+			var tile_data: Dictionary = _create_tile_data(terrain, tile_pos)
+			tiles[tile_pos] = tile_data
+	return tiles
+
+func _get_terrain(x: int, y: int) -> int:
+	var height: float = _height_noise.get_noise_2d(x, y)
+	var terrain: int = _noise_to_terrain(height)
+	if terrain == Terrain.GRASS or terrain == Terrain.FOREST:
+		var moisture: float = _moisture_noise.get_noise_2d(x, y)
+		if terrain == Terrain.GRASS and moisture > 0.3:
+			terrain = Terrain.FOREST
+		elif terrain == Terrain.FOREST and moisture < -0.3:
+			terrain = Terrain.GRASS
 	return terrain
 
 func _noise_to_terrain(val: float) -> int:
@@ -53,179 +63,113 @@ func _noise_to_terrain(val: float) -> int:
 		return Terrain.GRASS
 	elif val < 0.6:
 		return Terrain.FOREST
-	elif val < 0.8:
-		return Terrain.ROCK
 	else:
-		return Terrain.MOUNTAIN
+		return Terrain.ROCK
 
-func _apply_moisture(terrain: Array, width: int, height: int) -> void:
-	for x in range(width):
-		for y in range(height):
-			if terrain[x][y] == Terrain.GRASS or terrain[x][y] == Terrain.FOREST:
-				var moisture: float = _moisture_noise.get_noise_2d(x, y)
-				if terrain[x][y] == Terrain.GRASS and moisture > 0.3:
-					terrain[x][y] = Terrain.FOREST
-				elif terrain[x][y] == Terrain.FOREST and moisture < -0.3:
-					terrain[x][y] = Terrain.GRASS
+func _create_tile_data(terrain: int, _tile_pos: Vector2i) -> Dictionary:
+	var data: Dictionary = {
+		"terrain": terrain,
+		"resource_type": "",
+		"resource_category": "",
+		"resource_amount": 0,
+		"resource_max": 0,
+		"gather_time": 0.0,
+		"gather_amount": 0,
+		"regenerate": false,
+		"regen_rate": 0.0,
+		"regen_delay": 0.0,
+		"regen_timer": 0.0,
+		"regen_waiting": false,
+	}
+	_assign_resource(data, terrain)
+	return data
 
-func _force_border_mountains(terrain: Array, width: int, height: int) -> void:
-	var border: int = 2
-	for x in range(width):
-		for y in range(height):
-			if x < border or x >= width - border or y < border or y >= height - border:
-				terrain[x][y] = Terrain.MOUNTAIN
+func _assign_resource(data: Dictionary, terrain: int) -> void:
+	match terrain:
+		Terrain.GRASS:
+			if _rng.randf() < 0.10:
+				_set_resource(data, "berry", "food", 8, 1.5, 2, true, 0.8, 20.0)
+			elif _rng.randf() < 0.08:
+				_set_resource(data, "fiber", "material", 8, 1.5, 2, true, 1.0, 20.0)
+		Terrain.FOREST:
+			if _rng.randf() < 0.12:
+				_set_resource(data, "wood", "material", 8, 3.0, 2, true, 0.3, 45.0)
+			elif _rng.randf() < 0.08:
+				_set_resource(data, "mushroom", "food", 5, 1.5, 2, true, 0.5, 30.0)
+		Terrain.ROCK:
+			if _rng.randf() < 0.10:
+				_set_resource(data, "stone", "material", 10, 4.0, 2, true, 0.2, 60.0)
+			elif _rng.randf() < 0.06:
+				_set_resource(data, "iron_ore", "material", 6, 6.0, 1, false, 0.0, 0.0)
 
-func _validate_connectivity(terrain: Array, width: int, height: int) -> bool:
-	var start: Vector2i = find_village_center(terrain, width, height)
-	if start == Vector2i(-1, -1):
-		return false
-	var visited: Dictionary = {}
-	var queue: Array[Vector2i] = [start]
-	visited[start] = true
-	var walkable_total: int = 0
-	for x in range(width):
-		for y in range(height):
-			if _is_walkable(terrain[x][y]):
-				walkable_total += 1
-	while not queue.is_empty():
-		var current: Vector2i = queue.pop_front()
-		for dir in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-			var neighbor: Vector2i = current + dir
-			if neighbor.x < 0 or neighbor.x >= width or neighbor.y < 0 or neighbor.y >= height:
-				continue
-			if visited.has(neighbor):
-				continue
-			if _is_walkable(terrain[neighbor.x][neighbor.y]):
-				visited[neighbor] = true
-				queue.append(neighbor)
-	var reachable: int = visited.size()
-	return reachable >= walkable_total * 0.4
+func _set_resource(data: Dictionary, type: String, category: String, max_amount: int, gather_time: float, gather_amount: int, regenerate: bool, regen_rate: float, regen_delay: float) -> void:
+	data["resource_type"] = type
+	data["resource_category"] = category
+	data["resource_amount"] = max_amount
+	data["resource_max"] = max_amount
+	data["gather_time"] = gather_time
+	data["gather_amount"] = gather_amount
+	data["regenerate"] = regenerate
+	data["regen_rate"] = regen_rate
+	data["regen_delay"] = regen_delay
 
-func _is_walkable(terrain_type: int) -> bool:
-	return terrain_type != Terrain.DEEP_WATER and terrain_type != Terrain.SHALLOW_WATER and terrain_type != Terrain.MOUNTAIN
-
-func find_village_center(terrain: Array, width: int, height: int) -> Vector2i:
-	var center: Vector2i = Vector2i(width / 2, height / 2)
-	var best: Vector2i = Vector2i(-1, -1)
-	var best_dist: float = INF
-	for x in range(width):
-		for y in range(height):
-			if terrain[x][y] == Terrain.GRASS:
-				var dist: float = Vector2(x - center.x, y - center.y).length()
-				if dist < best_dist:
-					var grass_count: int = _count_nearby_grass(terrain, x, y, width, height)
-					if grass_count >= 20:
-						best_dist = dist
-						best = Vector2i(x, y)
-	if best == Vector2i(-1, -1):
-		for x in range(width):
-			for y in range(height):
-				if terrain[x][y] == Terrain.GRASS:
-					return Vector2i(x, y)
+func find_village_center(terrain_data: Dictionary) -> Vector2i:
+	var best := Vector2i(0, 0)
+	var best_score: float = -1.0
+	for tile_pos in terrain_data:
+		if terrain_data[tile_pos]["terrain"] != Terrain.GRASS:
+			continue
+		var grass_count := 0
+		for dx in range(-3, 4):
+			for dy in range(-3, 4):
+				var neighbor: Vector2i = Vector2i(tile_pos) + Vector2i(dx, dy)
+				if terrain_data.has(neighbor) and terrain_data[neighbor]["terrain"] == Terrain.GRASS:
+					grass_count += 1
+		var dist: float = Vector2(tile_pos.x, tile_pos.y).length()
+		var score: float = grass_count - dist * 0.1
+		if score > best_score:
+			best_score = score
+			best = tile_pos
 	return best
 
-func _count_nearby_grass(terrain: Array, cx: int, cy: int, width: int, height: int) -> int:
-	var count: int = 0
-	for dx in range(-3, 4):
-		for dy in range(-3, 4):
-			var x: int = cx + dx
-			var y: int = cy + dy
-			if x >= 0 and x < width and y >= 0 and y < height:
-				if terrain[x][y] == Terrain.GRASS:
-					count += 1
-	return count
+func ensure_minimum_resources(terrain_data: Dictionary, village_pos: Vector2i) -> void:
+	var counts := {"berry": 0, "wood": 0, "stone": 0, "fiber": 0}
+	var minimums := {"berry": 5, "wood": 5, "stone": 3, "fiber": 3}
+	for tile_pos in terrain_data:
+		if tile_pos.distance_to(village_pos) > 8:
+			continue
+		var res_type: String = terrain_data[tile_pos]["resource_type"]
+		if counts.has(res_type):
+			counts[res_type] += 1
 
-func spawn_resources(terrain: Array, container: Node2D) -> void:
-	var width: int = terrain.size()
-	var height: int = terrain[0].size()
-	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
-	rng.seed = world_seed + 500
-	var village_pos: Vector2i = find_village_center(terrain, width, height)
-	var guaranteed_berries: int = 0
-	var guaranteed_trees: int = 0
-	var guaranteed_stones: int = 0
-	var guaranteed_fibers: int = 0
+	_rng.seed = world_seed + 999
+	for res_type in minimums:
+		while counts[res_type] < minimums[res_type]:
+			var offset := Vector2i(_rng.randi_range(-6, 6), _rng.randi_range(-6, 6))
+			var pos := village_pos + offset
+			if not terrain_data.has(pos):
+				continue
+			var data: Dictionary = terrain_data[pos]
+			if data["resource_type"] != "":
+				continue
+			var terrain: int = data["terrain"]
+			match res_type:
+				"berry":
+					if terrain == Terrain.GRASS:
+						_set_resource(data, "berry", "food", 8, 1.5, 2, true, 0.8, 20.0)
+						counts["berry"] += 1
+				"wood":
+					if terrain == Terrain.GRASS or terrain == Terrain.FOREST:
+						_set_resource(data, "wood", "material", 8, 3.0, 2, true, 0.3, 45.0)
+						counts["wood"] += 1
+				"stone":
+					if terrain == Terrain.ROCK or terrain == Terrain.GRASS or terrain == Terrain.FOREST:
+						_set_resource(data, "stone", "material", 10, 5.0, 1, true, 0.15, 90.0)
+						counts["stone"] += 1
+				"fiber":
+					if terrain == Terrain.GRASS:
+						_set_resource(data, "fiber", "material", 8, 1.5, 2, true, 1.0, 20.0)
+						counts["fiber"] += 1
 
-	for x in range(width):
-		for y in range(height):
-			var terrain_type: int = terrain[x][y]
-			var pos: Vector2 = Vector2(x * TILE_SIZE + TILE_SIZE / 2.0, y * TILE_SIZE + TILE_SIZE / 2.0)
-			var near_village: bool = Vector2i(x, y).distance_to(village_pos) < 8
-
-			match terrain_type:
-				Terrain.GRASS:
-					if rng.randf() < 0.10:
-						_place_resource(container, pos, "berry", "food", 8, 1.5, 2, true, 0.8, 20.0)
-						if near_village:
-							guaranteed_berries += 1
-					elif rng.randf() < 0.08:
-						_place_resource(container, pos, "fiber", "material", 8, 1.5, 2, true, 1.0, 20.0)
-						if near_village:
-							guaranteed_fibers += 1
-				Terrain.FOREST:
-					if rng.randf() < 0.12:
-						_place_resource(container, pos, "wood", "material", 8, 3.0, 2, true, 0.3, 45.0)
-						if near_village:
-							guaranteed_trees += 1
-					elif rng.randf() < 0.08:
-						_place_resource(container, pos, "mushroom", "food", 5, 1.5, 2, true, 0.5, 30.0)
-				Terrain.ROCK:
-					if rng.randf() < 0.10:
-						_place_resource(container, pos, "stone", "material", 10, 4.0, 2, true, 0.2, 60.0)
-						if near_village:
-							guaranteed_stones += 1
-					elif rng.randf() < 0.06:
-						_place_resource(container, pos, "iron_ore", "material", 6, 6.0, 1, false, 0.0, 0.0)
-
-	_ensure_minimum_resources(terrain, container, village_pos, guaranteed_berries, guaranteed_trees, guaranteed_stones, guaranteed_fibers, rng)
-
-func _ensure_minimum_resources(terrain: Array, container: Node2D, village_pos: Vector2i, berries: int, trees: int, stones: int, fibers: int, rng: RandomNumberGenerator) -> void:
-	var width: int = terrain.size()
-	var height: int = terrain[0].size()
-	while berries < 5:
-		var offset: Vector2i = Vector2i(rng.randi_range(-6, 6), rng.randi_range(-6, 6))
-		var pos_tile: Vector2i = village_pos + offset
-		if pos_tile.x >= 0 and pos_tile.x < width and pos_tile.y >= 0 and pos_tile.y < height:
-			if terrain[pos_tile.x][pos_tile.y] == Terrain.GRASS:
-				var pos: Vector2 = Vector2(pos_tile.x * TILE_SIZE + TILE_SIZE / 2.0, pos_tile.y * TILE_SIZE + TILE_SIZE / 2.0)
-				_place_resource(container, pos, "berry", "food", 8, 1.5, 2, true, 0.8, 20.0)
-				berries += 1
-	while trees < 5:
-		var offset: Vector2i = Vector2i(rng.randi_range(-8, 8), rng.randi_range(-8, 8))
-		var pos_tile: Vector2i = village_pos + offset
-		if pos_tile.x >= 0 and pos_tile.x < width and pos_tile.y >= 0 and pos_tile.y < height:
-			if terrain[pos_tile.x][pos_tile.y] == Terrain.GRASS or terrain[pos_tile.x][pos_tile.y] == Terrain.FOREST:
-				var pos: Vector2 = Vector2(pos_tile.x * TILE_SIZE + TILE_SIZE / 2.0, pos_tile.y * TILE_SIZE + TILE_SIZE / 2.0)
-				_place_resource(container, pos, "wood", "material", 8, 3.0, 2, true, 0.3, 45.0)
-				trees += 1
-	while stones < 3:
-		var offset: Vector2i = Vector2i(rng.randi_range(-8, 8), rng.randi_range(-8, 8))
-		var pos_tile: Vector2i = village_pos + offset
-		if pos_tile.x >= 0 and pos_tile.x < width and pos_tile.y >= 0 and pos_tile.y < height:
-			var t: int = terrain[pos_tile.x][pos_tile.y]
-			if t == Terrain.ROCK or t == Terrain.GRASS or t == Terrain.FOREST:
-				var pos: Vector2 = Vector2(pos_tile.x * TILE_SIZE + TILE_SIZE / 2.0, pos_tile.y * TILE_SIZE + TILE_SIZE / 2.0)
-				_place_resource(container, pos, "stone", "material", 10, 5.0, 1, true, 0.15, 90.0)
-				stones += 1
-	while fibers < 3:
-		var offset: Vector2i = Vector2i(rng.randi_range(-6, 6), rng.randi_range(-6, 6))
-		var pos_tile: Vector2i = village_pos + offset
-		if pos_tile.x >= 0 and pos_tile.x < width and pos_tile.y >= 0 and pos_tile.y < height:
-			if terrain[pos_tile.x][pos_tile.y] == Terrain.GRASS:
-				var pos: Vector2 = Vector2(pos_tile.x * TILE_SIZE + TILE_SIZE / 2.0, pos_tile.y * TILE_SIZE + TILE_SIZE / 2.0)
-				_place_resource(container, pos, "fiber", "material", 8, 1.5, 2, true, 1.0, 20.0)
-				fibers += 1
-
-func _place_resource(container: Node2D, pos: Vector2, type: String, category: String, max_amount: int, gather_time: float, gather_amount: int, regenerate: bool, regen_rate: float, regen_delay: float) -> void:
-	var resource_node: Node = preload("res://scenes/world/resource_node.tscn").instantiate()
-	resource_node.global_position = pos
-	resource_node.resource_type = type
-	resource_node.resource_category = category
-	resource_node.max_amount = max_amount
-	resource_node.current_amount = max_amount
-	resource_node.gather_time = gather_time
-	resource_node.gather_amount = gather_amount
-	resource_node.regenerate = regenerate
-	resource_node.regen_rate = regen_rate
-	resource_node.regen_delay = regen_delay
-	container.add_child(resource_node)
+static func is_walkable(terrain: int) -> bool:
+	return terrain != Terrain.DEEP_WATER and terrain != Terrain.SHALLOW_WATER

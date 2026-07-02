@@ -4,13 +4,18 @@ class_name Building
 @export var building_type: String = "shelter"
 @export var is_completed: bool = false
 
-var _storage: Dictionary = {}  # for chest/farm: {item_type: amount}
+var _storage: Dictionary = {}  # for chest/production buildings: {item_type: amount}
 const MAX_STORAGE_SLOTS := 20
 var _occupied: bool = false  # for research_table, smelter, loom
 
-var _farm_timer: float = 0.0
-const FARM_GROW_TIME := 30.0
-const FARM_MAX_STORED := 8
+var _production_timer: float = 0.0
+
+const PRODUCTION := {
+	"farm": {"output": "berry", "base_amount": 2, "time": 30.0, "max": 8, "buff_key": "farm_output"},
+	"lumber_camp": {"output": "wood", "base_amount": 2, "time": 35.0, "max": 8, "buff_key": ""},
+	"quarry": {"output": "stone", "base_amount": 2, "time": 40.0, "max": 8, "buff_key": ""},
+	"fishing_dock": {"output": "fish", "base_amount": 1, "time": 25.0, "max": 6, "buff_key": ""},
+}
 
 @onready var sprite: Sprite2D = $Sprite2D
 
@@ -21,22 +26,24 @@ func _ready() -> void:
 	_update_visual()
 
 func _process(delta: float) -> void:
-	if building_type != "farm" or not is_completed:
+	if not PRODUCTION.has(building_type) or not is_completed:
 		return
 	if GameManager.game_speed == 0.0:
 		return
-	var stored: int = _storage.get("berry", 0)
-	if stored >= FARM_MAX_STORED:
+	var prod: Dictionary = PRODUCTION[building_type]
+	var output_type: String = prod["output"]
+	var stored: int = _storage.get(output_type, 0)
+	if stored >= prod["max"]:
 		return
-	_farm_timer += delta * GameManager.game_speed
-	if _farm_timer >= FARM_GROW_TIME:
-		_farm_timer = 0.0
-		var output: int = 2
-		if TechTree.get_buff("farm_output", 1.0) > 1.0:
-			output = 4
-		if not _storage.has("berry"):
-			_storage["berry"] = 0
-		_storage["berry"] = mini(_storage["berry"] + output, FARM_MAX_STORED)
+	_production_timer += delta * GameManager.game_speed
+	if _production_timer >= prod["time"]:
+		_production_timer = 0.0
+		var amount: int = prod["base_amount"]
+		if prod["buff_key"] != "" and TechTree.get_buff(prod["buff_key"], 1.0) > 1.0:
+			amount *= 2
+		if not _storage.has(output_type):
+			_storage[output_type] = 0
+		_storage[output_type] = mini(_storage[output_type] + amount, prod["max"])
 
 func _update_visual() -> void:
 	if not sprite:
@@ -60,6 +67,9 @@ func _draw_building_sprite(img: Image) -> void:
 		"farm": _draw_farm(img)
 		"smelter": _draw_smelter(img)
 		"loom": _draw_loom(img)
+		"lumber_camp": _draw_lumber_camp(img)
+		"quarry": _draw_quarry(img)
+		"fishing_dock": _draw_fishing_dock(img)
 		_: img.fill(Color.WHITE)
 
 func _draw_shelter(img: Image) -> void:
@@ -184,19 +194,86 @@ func _draw_loom(img: Image) -> void:
 		for y in range(2, 12):
 			_px(img, x, y, thread if y % 2 == 0 else dt)
 
+func _draw_lumber_camp(img: Image) -> void:
+	var wood := Color(0.5, 0.35, 0.15)
+	var dw := Color(0.4, 0.25, 0.1)
+	var blade := Color(0.65, 0.65, 0.7)
+	var leaf := Color(0.2, 0.55, 0.15)
+	# log pile
+	for x in range(1, 13):
+		for y in range(9, 13):
+			_px(img, x, y, wood if (x + y) % 2 == 0 else dw)
+	# axe handle
+	for y in range(2, 9):
+		_px(img, 9, y, dw)
+	# axe blade
+	_px(img, 7, 2, blade); _px(img, 8, 2, blade)
+	_px(img, 7, 3, blade); _px(img, 8, 3, blade); _px(img, 10, 3, blade)
+	_px(img, 8, 4, blade); _px(img, 10, 4, blade)
+	# stump
+	for x in range(2, 6):
+		for y in range(6, 9):
+			_px(img, x, y, wood)
+	_px(img, 2, 5, leaf); _px(img, 4, 5, leaf); _px(img, 3, 4, leaf)
+
+func _draw_quarry(img: Image) -> void:
+	var rock := Color(0.55, 0.55, 0.55)
+	var dr := Color(0.4, 0.4, 0.42)
+	var pick := Color(0.6, 0.6, 0.65)
+	var handle := Color(0.45, 0.3, 0.15)
+	# rock face
+	for x in range(1, 13):
+		for y in range(6, 13):
+			_px(img, x, y, rock if (x * 3 + y) % 4 != 0 else dr)
+	for x in range(2, 11):
+		_px(img, x, 5, rock)
+	for x in range(4, 9):
+		_px(img, x, 4, dr)
+	# pickaxe
+	for y in range(1, 7):
+		_px(img, 10, y, handle)
+	_px(img, 8, 1, pick); _px(img, 9, 1, pick)
+	_px(img, 11, 1, pick); _px(img, 12, 1, pick)
+	_px(img, 9, 2, pick); _px(img, 11, 2, pick)
+
+func _draw_fishing_dock(img: Image) -> void:
+	var plank := Color(0.55, 0.4, 0.2)
+	var dp := Color(0.45, 0.32, 0.15)
+	var water := Color(0.3, 0.5, 0.75)
+	var rope := Color(0.7, 0.65, 0.5)
+	var fish_c := Color(0.6, 0.7, 0.8)
+	# water below
+	for x in range(0, 14):
+		for y in range(10, 14):
+			_px(img, x, y, water)
+	# dock planks
+	for x in range(2, 12):
+		for y in range(5, 10):
+			_px(img, x, y, plank if x % 3 != 0 else dp)
+	# support posts
+	for y in range(8, 13):
+		_px(img, 3, y, dp); _px(img, 10, y, dp)
+	# fishing rod
+	for y in range(0, 6):
+		_px(img, 8, y, dp)
+	_px(img, 9, 0, rope); _px(img, 10, 1, rope); _px(img, 11, 2, rope)
+	_px(img, 11, 3, rope); _px(img, 11, 4, fish_c)
+
 func has_harvest() -> bool:
-	if building_type != "farm":
+	if not PRODUCTION.has(building_type):
 		return false
-	return _storage.get("berry", 0) > 0
+	var output_type: String = PRODUCTION[building_type]["output"]
+	return _storage.get(output_type, 0) > 0
 
 func harvest() -> Dictionary:
-	if building_type != "farm":
+	if not PRODUCTION.has(building_type):
 		return {}
-	var amount: int = _storage.get("berry", 0)
+	var output_type: String = PRODUCTION[building_type]["output"]
+	var amount: int = _storage.get(output_type, 0)
 	if amount <= 0:
 		return {}
-	_storage.erase("berry")
-	return {"type": "berry", "amount": amount}
+	_storage.erase(output_type)
+	return {"type": output_type, "amount": amount}
 
 # Storage (chest) methods
 func add_item(type: String, amount: int) -> int:
@@ -224,12 +301,12 @@ func get_item_count(type: String) -> int:
 func get_food_count() -> int:
 	var count := 0
 	for type in _storage:
-		if type in ["berry", "mushroom", "raw_meat", "cooked_meat"]:
+		if type in ["berry", "mushroom", "raw_meat", "cooked_meat", "fish", "cooked_fish"]:
 			count += _storage[type]
 	return count
 
 func take_food() -> String:
-	for type in ["cooked_meat", "berry", "mushroom", "raw_meat"]:
+	for type in ["cooked_meat", "cooked_fish", "berry", "fish", "mushroom", "raw_meat"]:
 		if _storage.has(type) and _storage[type] > 0:
 			remove_item(type, 1)
 			return type

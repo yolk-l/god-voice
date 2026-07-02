@@ -111,6 +111,8 @@ func _reveal_area() -> void:
 			var tile: Vector2i = center + Vector2i(dx, dy)
 			if not known_area.has(tile):
 				known_area[tile] = true
+			if _world:
+				_world.request_chunk_at(tile)
 
 func equip(slot: String, item: String) -> void:
 	var old_item: String = equipment.get(slot, "")

@@ -2,8 +2,8 @@ extends Action
 
 var _target_pos: Vector2 = Vector2.ZERO
 var _explore_timer: float = 0.0
-const MAX_EXPLORE_TIME := 8.0
-const MAX_EXPLORE_RANGE := 10.0
+const MAX_EXPLORE_TIME := 12.0
+const MAX_EXPLORE_RANGE := 30.0
 
 func get_action_name() -> String:
 	return "explore"
@@ -15,20 +15,20 @@ func calculate_utility(villager: Villager, world: Node) -> float:
 	var camp: Vector2 = BuildingManager.get_camp()
 	var camp_tile: Vector2i = Vector2i(camp / 16.0)
 	var unexplored_near_camp := 0
-	for dx in range(-8, 9):
-		for dy in range(-8, 9):
+	for dx in range(-12, 13):
+		for dy in range(-12, 13):
 			var check: Vector2i = camp_tile + Vector2i(dx, dy)
 			if not villager.known_area.has(check):
 				unexplored_near_camp += 1
 
-	var nearby_food: Node = ResourceManager.find_nearest_in_area(
+	var nearby_food = ResourceManager.find_nearest_in_area(
 		camp, "food", 200.0, villager.known_area, false
 	)
 	var resource_scarce_bonus := 0.15 if nearby_food == null else 0.0
 
-	var base: float = 0.1 + clampf(unexplored_near_camp / 100.0, 0.0, 0.25) + resource_scarce_bonus
+	var base: float = 0.1 + clampf(unexplored_near_camp / 150.0, 0.0, 0.3) + resource_scarce_bonus
 	var dist_from_camp: float = villager.global_position.distance_to(camp)
-	if dist_from_camp > 160.0:
+	if dist_from_camp > 300.0:
 		base -= 0.2
 	return clampf(base, 0.0, 0.5)
 
@@ -54,19 +54,17 @@ func _find_explore_target(villager: Villager, world: Node) -> Vector2:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 
-	for _attempt in range(8):
+	for _attempt in range(12):
 		var angle := rng.randf() * TAU
-		var dist := rng.randf_range(4.0, MAX_EXPLORE_RANGE)
+		var dist := rng.randf_range(6.0, MAX_EXPLORE_RANGE)
 		var target_tile: Vector2i = camp_tile + Vector2i(int(cos(angle) * dist), int(sin(angle) * dist))
-		target_tile.x = clampi(target_tile.x, 2, 117)
-		target_tile.y = clampi(target_tile.y, 2, 117)
 
-		if not world.is_tile_walkable(target_tile):
+		if world.has_method("is_tile_walkable") and not world.is_tile_walkable(target_tile):
 			continue
 
 		var unexplored_count := 0
-		for dx in range(-3, 4):
-			for dy in range(-3, 4):
+		for dx in range(-4, 5):
+			for dy in range(-4, 5):
 				var check: Vector2i = target_tile + Vector2i(dx, dy)
 				if not villager.known_area.has(check):
 					unexplored_count += 1
@@ -77,6 +75,6 @@ func _find_explore_target(villager: Villager, world: Node) -> Vector2:
 
 	if best_pos == Vector2.ZERO:
 		var angle := rng.randf() * TAU
-		best_pos = camp + Vector2(cos(angle), sin(angle)) * 80.0
+		best_pos = camp + Vector2(cos(angle), sin(angle)) * 120.0
 
 	return best_pos

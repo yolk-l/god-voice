@@ -17,6 +17,9 @@ const BUILD_TIMES := {
 	"farm": 8.0,
 	"smelter": 10.0,
 	"loom": 8.0,
+	"lumber_camp": 8.0,
+	"quarry": 10.0,
+	"fishing_dock": 6.0,
 }
 
 func get_action_name() -> String:
@@ -67,6 +70,18 @@ func calculate_utility(villager: Villager, world: Node) -> float:
 		if _has_materials(villager, "loom"):
 			scores.append(0.55)
 
+	if TechTree.is_building_unlocked("lumber_camp") and BuildingManager.can_build_more("lumber_camp"):
+		if _has_materials(villager, "lumber_camp"):
+			scores.append(0.5)
+
+	if TechTree.is_building_unlocked("quarry") and BuildingManager.can_build_more("quarry"):
+		if _has_materials(villager, "quarry"):
+			scores.append(0.5)
+
+	if TechTree.is_building_unlocked("fishing_dock") and BuildingManager.can_build_more("fishing_dock"):
+		if _has_materials(villager, "fishing_dock"):
+			scores.append(0.5)
+
 	if scores.is_empty():
 		return 0.0
 	return scores.max()
@@ -79,8 +94,11 @@ func start(villager: Villager, world: Node) -> void:
 		print("[BUILD] %s: no buildable target found" % villager.villager_name)
 		_completed = true
 		return
+	if not BuildingManager.reserve_build(_target_building_type):
+		_completed = true
+		return
 	_build_time_required = BUILD_TIMES.get(_target_building_type, 6.0)
-	_build_position = BuildingManager.find_build_position(world)
+	_build_position = BuildingManager.find_build_position(world, _target_building_type)
 	print("[BUILD] %s: starting %s at %s inv:%s" % [villager.villager_name, _target_building_type, _build_position, villager.inventory.get_all_items()])
 
 	if villager.inventory.has_materials_for(_target_building_type):
@@ -93,6 +111,7 @@ func start(villager: Villager, world: Node) -> void:
 			villager.navigate_to(chest.global_position)
 		else:
 			print("[BUILD] %s: no materials in inventory and no chest" % villager.villager_name)
+			BuildingManager.release_reservation(_target_building_type)
 			_completed = true
 
 func tick(villager: Villager, world: Node, delta: float) -> void:
@@ -102,6 +121,7 @@ func tick(villager: Villager, world: Node, delta: float) -> void:
 				var cost: Dictionary = VillagerInventory.get_recipe_cost(_target_building_type)
 				BuildingManager.withdraw_items(villager, cost)
 				if not villager.inventory.has_materials_for(_target_building_type):
+					BuildingManager.release_reservation(_target_building_type)
 					_completed = true
 					return
 				_phase = Phase.WALKING_TO_SITE
@@ -109,6 +129,7 @@ func tick(villager: Villager, world: Node, delta: float) -> void:
 		Phase.WALKING_TO_SITE:
 			if villager.has_reached_target():
 				if not villager.inventory.has_materials_for(_target_building_type):
+					BuildingManager.release_reservation(_target_building_type)
 					_completed = true
 					return
 				villager.inventory.consume_materials(_target_building_type)
@@ -117,12 +138,15 @@ func tick(villager: Villager, world: Node, delta: float) -> void:
 		Phase.BUILDING:
 			_build_timer += delta
 			if _build_timer >= _build_time_required:
+				BuildingManager.release_reservation(_target_building_type)
 				_place_building(villager, world)
 				villager.needs.set_working(false)
 				_completed = true
 
 func cancel(villager: Villager, world: Node) -> void:
 	villager.needs.set_working(false)
+	if _target_building_type != "":
+		BuildingManager.release_reservation(_target_building_type)
 	_completed = true
 
 func _has_materials(villager: Villager, recipe: String) -> bool:
@@ -152,6 +176,15 @@ func _find_best_building(villager: Villager) -> String:
 	if TechTree.is_building_unlocked("loom") and BuildingManager.can_build_more("loom"):
 		if _has_materials(villager, "loom"):
 			return "loom"
+	if TechTree.is_building_unlocked("lumber_camp") and BuildingManager.can_build_more("lumber_camp"):
+		if _has_materials(villager, "lumber_camp"):
+			return "lumber_camp"
+	if TechTree.is_building_unlocked("quarry") and BuildingManager.can_build_more("quarry"):
+		if _has_materials(villager, "quarry"):
+			return "quarry"
+	if TechTree.is_building_unlocked("fishing_dock") and BuildingManager.can_build_more("fishing_dock"):
+		if _has_materials(villager, "fishing_dock"):
+			return "fishing_dock"
 	return ""
 
 func _place_building(villager: Villager, world: Node) -> void:

@@ -80,7 +80,7 @@ func drop_all() -> Array:
 	return dropped
 
 func _is_food(type: String) -> bool:
-	return type in ["berry", "mushroom", "raw_meat", "cooked_meat", "cooked_fish"]
+	return type in ["berry", "mushroom", "raw_meat", "cooked_meat", "fish", "cooked_fish"]
 
 static func get_recipe_cost(recipe: String) -> Dictionary:
 	match recipe:
@@ -92,6 +92,9 @@ static func get_recipe_cost(recipe: String) -> Dictionary:
 		"farm": return {"wood": 5, "fiber": 5}
 		"smelter": return {"stone": 8, "wood": 3}
 		"loom": return {"wood": 5, "rope": 2}
+		"lumber_camp": return {"wood": 5, "stone": 3}
+		"quarry": return {"stone": 5, "wood": 5}
+		"fishing_dock": return {"wood": 8, "fiber": 3}
 		"rope": return {"fiber": 3}
 		"stone_axe": return {"wood": 2, "stone": 2}
 		"stone_pickaxe": return {"wood": 2, "stone": 2}
@@ -103,4 +106,6 @@ static func get_food_nutrition(type: String) -> float:
 		"mushroom": return 20.0
 		"raw_meat": return 10.0
 		"cooked_meat": return 30.0
+		"fish": return 18.0
+		"cooked_fish": return 28.0
 		_: return 0.0
